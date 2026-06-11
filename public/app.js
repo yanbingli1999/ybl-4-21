@@ -287,50 +287,50 @@ function generateCSV(result, fields) {
   if (hasOutliers) headers.push('is_outlier', 'z_score');
 
   const rows = [];
-  rows.push(headers.join(','));
+  if (headers.length > 0) {
+    rows.push(headers.join(','));
+    result.points.forEach((p, i) => {
+      const row = [];
+      if (hasOriginal) row.push(p.x, p.y);
+      if (hasPredicted) row.push(predictedPoints[i].x, predictedPoints[i].y.toFixed(8));
+      if (hasResiduals) row.push(result.residuals[i].toFixed(8));
+      if (hasOutliers) {
+        const outlier = result.outliers[i];
+        row.push(outlier.isOutlier ? 'yes' : 'no', outlier.zScore.toFixed(6));
+      }
+      rows.push(row.join(','));
+    });
+  }
 
-  result.points.forEach((p, i) => {
-    const row = [];
-    if (hasOriginal) row.push(p.x, p.y);
-    if (hasPredicted) row.push(predictedPoints[i].x, predictedPoints[i].y.toFixed(8));
-    if (hasResiduals) row.push(result.residuals[i].toFixed(8));
-    if (hasOutliers) {
-      const outlier = result.outliers[i];
-      row.push(outlier.isOutlier ? 'yes' : 'no', outlier.zScore.toFixed(6));
-    }
-    rows.push(row.join(','));
-  });
+  const metaRows = [];
+  if (hasModelParams) {
+    metaRows.push(['model_type', result.modelType]);
+    metaRows.push(['model_equation', result.modelEquation]);
+    Object.entries(result.params).forEach(([key, value]) => {
+      metaRows.push([`param_${key}`, value]);
+    });
+  }
+  if (hasErrorMetrics) {
+    Object.entries(result.metrics).forEach(([key, value]) => {
+      metaRows.push([`metric_${key}`, value]);
+    });
+  }
 
-  if (hasModelParams || hasErrorMetrics) {
-    rows.push('');
-    rows.push('--- Metadata ---');
-    if (hasModelParams) {
-      rows.push(`model_type,${result.modelType}`);
-      rows.push(`model_equation,"${result.modelEquation}"`);
-      Object.entries(result.params).forEach(([key, value]) => {
-        rows.push(`param_${key},${value}`);
-      });
-    }
-    if (hasErrorMetrics) {
-      Object.entries(result.metrics).forEach(([key, value]) => {
-        rows.push(`metric_${key},${value}`);
-      });
-    }
-    rows.push(`dataset_name,"${result.datasetName}"`);
-    rows.push(`created_at,${result.createdAt}`);
+  if (metaRows.length > 0) {
+    if (rows.length > 0) rows.push('');
+    metaRows.forEach(([k, v]) => {
+      const vStr = typeof v === 'string' && (v.includes(',') || v.includes('"'))
+        ? `"${v.replace(/"/g, '""')}"`
+        : v;
+      rows.push(`${k},${vStr}`);
+    });
   }
 
   return rows.join('\n');
 }
 
 function generateJSON(result, fields) {
-  const output = {
-    exportTime: new Date().toISOString(),
-    datasetName: result.datasetName,
-    modelType: result.modelType,
-    modelEquation: result.modelEquation,
-    pointsCount: result.points.length
-  };
+  const output = {};
 
   const predictedPoints = fields.includes('predictedPoints') ? calculatePredictedPoints(result) : null;
 
@@ -348,6 +348,8 @@ function generateJSON(result, fields) {
   }
   if (fields.includes('modelParams')) {
     output.modelParams = result.params;
+    output.modelType = result.modelType;
+    output.modelEquation = result.modelEquation;
   }
   if (fields.includes('errorMetrics')) {
     output.errorMetrics = result.metrics;
@@ -356,17 +358,17 @@ function generateJSON(result, fields) {
   return JSON.stringify(output, null, 2);
 }
 
-async function logExport(filename, format, fields) {
+async function logExport(filename, format, fields, datasetName) {
   try {
     await fetch('/api/export-log', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json;charset=utf-8' },
       body: JSON.stringify({
         filename,
         format,
         fields,
         resultId: currentResultId,
-        datasetName: currentFitResult?.datasetName
+        datasetName: datasetName || currentFitResult?.datasetName
       })
     });
   } catch (err) {
@@ -387,8 +389,8 @@ async function exportData() {
   }
 
   const format = getExportFormat();
-  const datasetName = currentFitResult.datasetName || 'fit_result';
-  const safeName = datasetName.replace(/[<>:"/\\|?*]/g, '_');
+  const currentName = document.getElementById('datasetName').value || 'fit_result';
+  const safeName = currentName.replace(/[<>:"/\\|?*]/g, '_');
   const filename = `${safeName}.${format}`;
 
   let content;
@@ -413,7 +415,7 @@ async function exportData() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  await logExport(filename, format, fields);
+  await logExport(filename, format, fields, currentName);
   showToast(`已导出 ${filename}`, 'success');
 }
 

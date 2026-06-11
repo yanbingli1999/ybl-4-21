@@ -14,6 +14,10 @@ const EXPORT_LOG_FILE = path.join(DATA_DIR, 'export_log.json');
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use('/api', (req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 function ensureDataFiles() {
@@ -42,7 +46,7 @@ function readJsonFile(filePath) {
 }
 
 function writeJsonFile(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
 function generateId() {
