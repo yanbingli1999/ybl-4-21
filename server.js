@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DATASETS_FILE = path.join(DATA_DIR, 'datasets.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const EXPORT_LOG_FILE = path.join(DATA_DIR, 'export_log.json');
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -24,6 +25,9 @@ function ensureDataFiles() {
   }
   if (!fs.existsSync(HISTORY_FILE)) {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(EXPORT_LOG_FILE)) {
+    fs.writeFileSync(EXPORT_LOG_FILE, JSON.stringify([], null, 2));
   }
 }
 ensureDataFiles();
@@ -318,6 +322,34 @@ app.delete('/api/history/:id', (req, res) => {
   }
   writeJsonFile(HISTORY_FILE, history);
   res.json({ success: true });
+});
+
+app.post('/api/export-log', (req, res) => {
+  const { filename, format, fields, resultId, datasetName } = req.body;
+
+  const logEntry = {
+    id: generateId(),
+    exportTime: new Date().toISOString(),
+    filename,
+    format,
+    fields: Array.isArray(fields) ? fields : [],
+    resultId: resultId || null,
+    datasetName: datasetName || null
+  };
+
+  const logs = readJsonFile(EXPORT_LOG_FILE);
+  logs.unshift(logEntry);
+  if (logs.length > 200) {
+    logs.length = 200;
+  }
+  writeJsonFile(EXPORT_LOG_FILE, logs);
+
+  res.json({ success: true });
+});
+
+app.get('/api/export-log', (req, res) => {
+  const logs = readJsonFile(EXPORT_LOG_FILE);
+  res.json(logs);
 });
 
 app.listen(PORT, () => {

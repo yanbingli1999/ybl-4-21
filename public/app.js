@@ -2,6 +2,7 @@ let fitChart = null;
 let residualChart = null;
 let currentResultId = null;
 let currentDatasetId = null;
+let currentFitResult = null;
 let isDirty = false;
 
 const modelTypeLabels = {
@@ -226,6 +227,8 @@ function clearDataTable() {
 }
 
 function resetDisplay() {
+  currentFitResult = null;
+  document.getElementById('exportBtn').disabled = true;
   document.getElementById('metricR2').textContent = '—';
   document.getElementById('metricMSE').textContent = '—';
   document.getElementById('metricRMSE').textContent = '—';
@@ -241,6 +244,177 @@ function resetDisplay() {
     residualChart.data.datasets.forEach(ds => ds.data = []);
     residualChart.update();
   }
+}
+
+function getSelectedExportFields() {
+  const checkboxes = document.querySelectorAll('.export-field:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function getExportFormat() {
+  return document.querySelector('input[name="exportFormat"]:checked').value;
+}
+
+function updateFilenamePreview() {
+  const format = getExportFormat();
+  const datasetName = document.getElementById('datasetName').value || 'fit_result';
+  const safeName = datasetName.replace(/[<>:"/\\|?*]/g, '_');
+  const preview = document.getElementById('filenamePreview');
+  preview.textContent = `${safeName}.${format}`;
+}
+
+function calculatePredictedPoints(result) {
+  return result.points.map((p, i) => ({
+    x: p.x,
+    y: result.residuals ? p.y - result.residuals[i] : p.y
+  }));
+}
+
+function generateCSV(result, fields) {
+  const hasOriginal = fields.includes('originalPoints');
+  const hasPredicted = fields.includes('predictedPoints');
+  const hasResiduals = fields.includes('residuals');
+  const hasOutliers = fields.includes('outliers');
+  const hasModelParams = fields.includes('modelParams');
+  const hasErrorMetrics = fields.includes('errorMetrics');
+
+  const predictedPoints = hasPredicted ? calculatePredictedPoints(result) : [];
+
+  const headers = [];
+  if (hasOriginal) headers.push('x_original', 'y_original');
+  if (hasPredicted) headers.push('x_predicted', 'y_predicted');
+  if (hasResiduals) headers.push('residual');
+  if (hasOutliers) headers.push('is_outlier', 'z_score');
+
+  const rows = [];
+  rows.push(headers.join(','));
+
+  result.points.forEach((p, i) => {
+    const row = [];
+    if (hasOriginal) row.push(p.x, p.y);
+    if (hasPredicted) row.push(predictedPoints[i].x, predictedPoints[i].y.toFixed(8));
+    if (hasResiduals) row.push(result.residuals[i].toFixed(8));
+    if (hasOutliers) {
+      const outlier = result.outliers[i];
+      row.push(outlier.isOutlier ? 'yes' : 'no', outlier.zScore.toFixed(6));
+    }
+    rows.push(row.join(','));
+  });
+
+  if (hasModelParams || hasErrorMetrics) {
+    rows.push('');
+    rows.push('--- Metadata ---');
+    if (hasModelParams) {
+      rows.push(`model_type,${result.modelType}`);
+      rows.push(`model_equation,"${result.modelEquation}"`);
+      Object.entries(result.params).forEach(([key, value]) => {
+        rows.push(`param_${key},${value}`);
+      });
+    }
+    if (hasErrorMetrics) {
+      Object.entries(result.metrics).forEach(([key, value]) => {
+        rows.push(`metric_${key},${value}`);
+      });
+    }
+    rows.push(`dataset_name,"${result.datasetName}"`);
+    rows.push(`created_at,${result.createdAt}`);
+  }
+
+  return rows.join('\n');
+}
+
+function generateJSON(result, fields) {
+  const output = {
+    exportTime: new Date().toISOString(),
+    datasetName: result.datasetName,
+    modelType: result.modelType,
+    modelEquation: result.modelEquation,
+    pointsCount: result.points.length
+  };
+
+  const predictedPoints = fields.includes('predictedPoints') ? calculatePredictedPoints(result) : null;
+
+  if (fields.includes('originalPoints')) {
+    output.originalPoints = result.points;
+  }
+  if (fields.includes('predictedPoints')) {
+    output.predictedPoints = predictedPoints;
+  }
+  if (fields.includes('residuals')) {
+    output.residuals = result.residuals;
+  }
+  if (fields.includes('outliers')) {
+    output.outliers = result.outliers;
+  }
+  if (fields.includes('modelParams')) {
+    output.modelParams = result.params;
+  }
+  if (fields.includes('errorMetrics')) {
+    output.errorMetrics = result.metrics;
+  }
+
+  return JSON.stringify(output, null, 2);
+}
+
+async function logExport(filename, format, fields) {
+  try {
+    await fetch('/api/export-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename,
+        format,
+        fields,
+        resultId: currentResultId,
+        datasetName: currentFitResult?.datasetName
+      })
+    });
+  } catch (err) {
+    console.warn('导出日志记录失败:', err);
+  }
+}
+
+async function exportData() {
+  if (!currentFitResult) {
+    showToast('请先执行拟合', 'error');
+    return;
+  }
+
+  const fields = getSelectedExportFields();
+  if (fields.length === 0) {
+    showToast('请至少选择一个导出字段', 'error');
+    return;
+  }
+
+  const format = getExportFormat();
+  const datasetName = currentFitResult.datasetName || 'fit_result';
+  const safeName = datasetName.replace(/[<>:"/\\|?*]/g, '_');
+  const filename = `${safeName}.${format}`;
+
+  let content;
+  let mimeType;
+
+  if (format === 'csv') {
+    content = generateCSV(currentFitResult, fields);
+    mimeType = 'text/csv;charset=utf-8';
+  } else {
+    content = generateJSON(currentFitResult, fields);
+    mimeType = 'application/json;charset=utf-8';
+  }
+
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  await logExport(filename, format, fields);
+  showToast(`已导出 ${filename}`, 'success');
 }
 
 function getTableData() {
@@ -325,6 +499,10 @@ async function performFit() {
 }
 
 function displayFitResult(result) {
+  currentFitResult = result;
+  document.getElementById('exportBtn').disabled = false;
+  updateFilenamePreview();
+
   document.getElementById('metricR2').textContent = result.metrics.rSquared.toFixed(6);
   document.getElementById('metricMSE').textContent = result.metrics.mse.toFixed(6);
   document.getElementById('metricRMSE').textContent = result.metrics.rmse.toFixed(6);
@@ -590,7 +768,17 @@ function initEventListeners() {
   document.getElementById('fitBtn').addEventListener('click', performFit);
   document.getElementById('saveDatasetBtn').addEventListener('click', saveCurrentDataset);
   document.getElementById('updateDatasetBtn').addEventListener('click', updateCurrentDataset);
-  document.getElementById('datasetName').addEventListener('input', markDirty);
+  document.getElementById('datasetName').addEventListener('input', () => {
+    markDirty();
+    updateFilenamePreview();
+  });
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.querySelectorAll('.export-field').forEach(cb => {
+    cb.addEventListener('change', updateFilenamePreview);
+  });
+  document.querySelectorAll('input[name="exportFormat"]').forEach(radio => {
+    radio.addEventListener('change', updateFilenamePreview);
+  });
 }
 
 function init() {

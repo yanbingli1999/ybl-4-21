@@ -604,6 +604,118 @@ body {
   border-bottom: 2px solid #e2e8f0;
 }
 
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field-group-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 10px;
+}
+
+.field-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.field-checkbox:hover {
+  background: #f1f5f9;
+}
+
+.field-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.field-checkbox span {
+  font-size: 13px;
+  color: #334155;
+}
+
+.export-format-group .format-options {
+  display: flex;
+  gap: 10px;
+}
+
+.format-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.format-option:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.format-option input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.format-option span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.format-option:has(input:checked) {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+}
+
+.export-filename-group {
+  margin-top: 4px;
+}
+
+.filename-preview {
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  color: #475569;
+  word-break: break-all;
+  text-align: center;
+}
+
+#exportBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 @media (max-width: 1400px) {
   .main-layout {
     grid-template-columns: 300px 1fr 280px;
