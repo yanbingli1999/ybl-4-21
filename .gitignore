@@ -1,0 +1,74 @@
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caches
+.cache/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.parcel-cache/
+.vite/
+.next/
+.nuxt/
+.turbo/
+.eslintcache
+.stylelintcache
+*.cache
+*.tmp
+tmp/
+temp/
+
+# Local secrets
+*.pem
+*.key
+*.cert
+*.p12
+secrets/
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Large binary artifacts
+*.iso
+*.dmg
+*.exe
+*.msi
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.sqlite
+*.sqlite3
+*.db
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
